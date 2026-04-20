@@ -2,6 +2,8 @@ package com.microsoft.migration.assets.service;
 
 import com.microsoft.migration.assets.model.ImageProcessingMessage;
 import com.microsoft.migration.assets.model.S3StorageItem;
+import com.microsoft.migration.assets.util.FileTypeValidator;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -11,9 +13,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import jakarta.annotation.PostConstruct;
-import java.io.*;
-import java.nio.file.*;
+import java.io.BufferedInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
@@ -85,7 +92,13 @@ public class LocalFileStorageService implements StorageService {
         if (file.isEmpty()) {
             throw new IOException("Failed to store empty file");
         }
-        
+
+        // CWE-434: Validate file type against an allowlist before storing.
+        if (!FileTypeValidator.isAllowed(file)) {
+            throw new IOException("File type not permitted. Only image files are accepted: "
+                    + FileTypeValidator.getAllowedTypesDescription());
+        }
+
         String filename = StringUtils.cleanPath(file.getOriginalFilename());
         if (filename.contains("..")) {
             throw new IOException("Cannot store file with relative path outside current directory");

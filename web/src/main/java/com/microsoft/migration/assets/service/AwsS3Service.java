@@ -4,6 +4,7 @@ import com.microsoft.migration.assets.model.ImageMetadata;
 import com.microsoft.migration.assets.model.ImageProcessingMessage;
 import com.microsoft.migration.assets.model.S3StorageItem;
 import com.microsoft.migration.assets.repository.ImageMetadataRepository;
+import com.microsoft.migration.assets.util.FileTypeValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,7 +13,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.*;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -66,6 +71,12 @@ public class AwsS3Service implements StorageService {
 
     @Override
     public void uploadObject(MultipartFile file) throws IOException {
+        // CWE-434: Validate file type against an allowlist before storing.
+        if (!FileTypeValidator.isAllowed(file)) {
+            throw new IOException("File type not permitted. Only image files are accepted: "
+                    + FileTypeValidator.getAllowedTypesDescription());
+        }
+
         String key = generateKey(file.getOriginalFilename());
         PutObjectRequest request = PutObjectRequest.builder()
                 .bucket(bucketName)
